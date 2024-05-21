@@ -5,6 +5,8 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"github.com/Azure/azure-sdk-for-go/sdk/azcore/policy"
+	"github.com/Azure/azure-sdk-for-go/sdk/azidentity"
 	"reflect"
 	"strconv"
 	"strings"
@@ -20,6 +22,11 @@ import (
 	"github.com/grafana/grafana-plugin-sdk-go/backend/log"
 	"github.com/grafana/grafana/pkg/setting"
 	"github.com/grafana/grafana/pkg/tsdb/grafana-postgresql-datasource/sqleng"
+)
+
+const (
+	azureAuthentication = "azure-ad-auth"
+	psqlAuthentication  = "postgres-auth"
 )
 
 func ProvideService(cfg *setting.Cfg) *Service {
@@ -210,9 +217,31 @@ func (s *Service) generateConnectionString(dsInfo sqleng.DataSourceInfo) (string
 			}
 		}
 	}
+	passwd := ""
+	switch dsInfo.JsonData.AuthenticationType {
+	case azureAuthentication:
+		logger.Debug("Authentication postgres using DefaultAzureCredential")
+		cred, err := azidentity.NewDefaultAzureCredential(nil)
+		if err != nil {
+			return "", err
+		}
+
+		token, err := cred.GetToken(context.Background(), policy.TokenRequestOptions{
+			Scopes: []string{"https://ossrdbms-aad.database.windows.net/.default"},
+		})
+
+		if err != nil {
+			return "", err
+		}
+		passwd = token.Token
+	case psqlAuthentication:
+	default:
+		logger.Debug("Authentication postgres username/password")
+		passwd = escape(dsInfo.DecryptedSecureJSONData["password"])
+	}
 
 	connStr := fmt.Sprintf("user='%s' password='%s' host='%s' dbname='%s'",
-		escape(dsInfo.User), escape(dsInfo.DecryptedSecureJSONData["password"]), escape(host), escape(dsInfo.Database))
+		escape(dsInfo.User), passwd, escape(host), escape(dsInfo.Database))
 	if port > 0 {
 		connStr += fmt.Sprintf(" port=%d", port)
 	}

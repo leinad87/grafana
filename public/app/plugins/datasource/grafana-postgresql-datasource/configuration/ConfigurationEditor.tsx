@@ -12,19 +12,25 @@ import { ConfigSection, ConfigSubSection, DataSourceDescription, Stack } from '@
 import { config } from '@grafana/runtime';
 import { ConnectionLimits, Divider, TLSSecretsConfig, useMigrateDatabaseFields } from '@grafana/sql';
 import {
-  Input,
-  Select,
-  SecretInput,
-  Field,
-  Tooltip,
-  Label,
-  Icon,
-  Switch,
-  SecureSocksProxySettings,
   Collapse,
+  Field,
+  Icon,
+  Input,
+  Label,
+  SecretInput,
+  SecureSocksProxySettings,
+  Select,
+  Switch,
+  Tooltip,
 } from '@grafana/ui';
 
-import { PostgresOptions, PostgresTLSMethods, PostgresTLSModes, SecureJsonData } from '../types';
+import {
+  PostgresAuthenticationType,
+  PostgresOptions,
+  PostgresTLSMethods,
+  PostgresTLSModes,
+  SecureJsonData,
+} from '../types';
 
 import { useAutoDetectFeatures } from './useAutoDetectFeatures';
 
@@ -68,6 +74,11 @@ export const PostgresConfigEditor = (props: DataSourcePluginOptionsEditorProps<P
   const tlsMethods: Array<SelectableValue<PostgresTLSMethods>> = [
     { value: PostgresTLSMethods.filePath, label: 'File system path' },
     { value: PostgresTLSMethods.fileContent, label: 'Certificate content' },
+  ];
+
+  const authMethods: Array<SelectableValue<PostgresAuthenticationType>> = [
+    { value: PostgresAuthenticationType.azureAuthentication, label: 'Azure AD Authentication' },
+    { value: PostgresAuthenticationType.psqlAuthentication, label: 'Postgres Authentication' },
   ];
 
   const onJSONDataOptionSelected = (property: keyof PostgresOptions) => {
@@ -135,6 +146,32 @@ export const PostgresConfigEditor = (props: DataSourcePluginOptionsEditorProps<P
       <Divider />
 
       <ConfigSection title="Authentication">
+        <Field
+          label="Authentication Type"
+          htmlFor="authenticationType"
+          description={
+            <ul>
+              <li>
+                <i>Postgres Authentication</i> This is the default mechanism to connect to Postgres. Enter the username
+                and password.
+              </li>
+              <li>
+                <i>Azure AD Authentication</i> Securely authenticate and access Postgres using Azure AD credentials.
+                Managed Service Identity is supported.
+              </li>
+            </ul>
+          }
+        >
+          <Select
+            // Default to basic authentication of none is set
+            value={jsonData.authenticationType || PostgresAuthenticationType.psqlAuthentication}
+            inputId="authenticationType"
+            options={authMethods}
+            onChange={onJSONDataOptionSelected('authenticationType')}
+            width={WIDTH_LONG}
+          />
+        </Field>
+
         <Field label="Username" required>
           <Input
             width={WIDTH_LONG}
@@ -143,16 +180,18 @@ export const PostgresConfigEditor = (props: DataSourcePluginOptionsEditorProps<P
             onChange={onDSOptionChanged('user')}
           />
         </Field>
-
-        <Field label="Password" required>
-          <SecretInput
-            width={WIDTH_LONG}
-            placeholder="Password"
-            isConfigured={options.secureJsonFields && options.secureJsonFields.password}
-            onReset={onResetPassword}
-            onBlur={onUpdateDatasourceSecureJsonDataOption(props, 'password')}
-          />
-        </Field>
+        {(jsonData.authenticationType === PostgresAuthenticationType.psqlAuthentication ||
+          !jsonData.authenticationType) && (
+          <Field label="Password" required>
+            <SecretInput
+              width={WIDTH_LONG}
+              placeholder="Password"
+              isConfigured={options.secureJsonFields && options.secureJsonFields.password}
+              onReset={onResetPassword}
+              onBlur={onUpdateDatasourceSecureJsonDataOption(props, 'password')}
+            />
+          </Field>
+        )}
 
         <Field
           label={

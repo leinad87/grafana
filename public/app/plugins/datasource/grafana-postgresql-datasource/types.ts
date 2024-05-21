@@ -11,6 +11,12 @@ export enum PostgresTLSMethods {
   filePath = 'file-path',
   fileContent = 'file-content',
 }
+
+export enum PostgresAuthenticationType {
+  azureAuthentication = 'azure-ad-auth',
+  psqlAuthentication = 'postgres-auth',
+}
+
 export interface PostgresOptions extends SQLOptions {
   tlsConfigurationMethod?: PostgresTLSMethods;
   sslmode?: PostgresTLSModes;
@@ -20,6 +26,7 @@ export interface PostgresOptions extends SQLOptions {
   postgresVersion?: number;
   timescaledb?: boolean;
   enableSecureSocksProxy?: boolean;
+  authenticationType?: PostgresAuthenticationType;
 }
 
 export interface SecureJsonData {
